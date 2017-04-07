@@ -99,7 +99,7 @@ def lambda_handler(event, context):
         if len(failures)==0:
             break
         LOGGER.info("Failure sending dynamo write batch, waiting and retrying (attempt {0})".format(try_cnt))
-        time.sleep(max(5*try_cnt,245-time.time()+tstart))
+        time.sleep(min(5*try_cnt,245-time.time()+tstart))
         dyn_requests = failures
     if len(failures)!=0:
         # we've failed!
