@@ -1,0 +1,59 @@
+# Welcome to Serverless!
+
+service: dynamo-multimaster
+
+provider:
+  name: aws
+  runtime: python2.7
+  stage: ${opt:env}
+  cfLogs: true
+  region: ${opt:region}
+  stackTags:
+    application: dynamo-multimaster
+    environment: ${opt:env}
+  stackPolicy:
+    - Effect: Allow
+      Principal: "*"
+      Action: "Update:*"
+      Resource: "*"
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - dynamodb:BatchWriteItem
+      Resource:
+        - "arn:aws:dynamodb:${opt:target-region}:*:table/${opt:target-table}"
+    - Effect: Allow
+      Action:
+        - dynamodb:GetRecords
+        - dynamodb:GetShardIterator
+        - dynamodb:DescribeStream
+        - dynamodb:ListStreams
+      Resource: "${opt:source-stream}"
+    - Effect: Allow
+      Action:
+        - logs:CreateLogGroup
+        - logs:CreateLogStream
+        - logs:PutLogEvents
+      Resource: "arn:aws:logs:*:*:*"
+    - Effect: Allow
+      Action:
+        - lambda:InvokeFunction
+      Resource: "*"
+  environment:
+    TARGET_TABLE: ${opt:target-table}
+    TARGET_REGION: ${opt:target-region}
+  include:
+    - lib/**
+functions:
+  Replicator:
+    handler: replicator.lambda_handler
+    name: ${opt:env}-dynamo-replicator
+    memorySize: 512
+    timeout: 300
+    description: Replicate ${opt:source-stream} to ${opt:target-region}:${opt:target-table} 
+    events:
+      - stream:
+          type: kinesis
+          batchSize: 100
+          startingPosition: LATEST
+          arn: "${opt:source-stream}"

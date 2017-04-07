@@ -1,0 +1,24 @@
+#!/usr/bin/python
+import boto3
+import subprocess
+
+TNAME = 'test-dynamo-replicate'
+
+c1 = boto3.client('dynamodb',region_name='eu-west-1')
+c2 = boto3.client('dynamodb',region_name='us-east-1')
+
+CMD = 'cd ..; serverless remove --env test --region {0} --target-region none --target-table none --source-stream none'
+
+
+print "cleaning up tables"
+try:
+    c1.delete_table(TableName=TNAME)
+except:
+    print "error cleaning up table 1"
+try:
+    c2.delete_table(TableName=TNAME)
+except:
+    print "error cleaning up table 2"
+
+subprocess.call(CMD.format('us-east-1'),shell=True)
+subprocess.call(CMD.format('eu-west-1'),shell=True)

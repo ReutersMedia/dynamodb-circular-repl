@@ -1,0 +1,48 @@
+#!/usr/bin/python
+
+import boto3
+import subprocess
+import time
+import random
+
+ATTR_DEF = [{'AttributeName': 'PK1',
+             'AttributeType': 'N'},
+            {'AttributeName': 'PK2',
+             'AttributeType': 'N'}]
+
+KEY_SCHEMA = [{'AttributeName': 'PK1',
+               'KeyType': 'HASH'},
+              {'AttributeName': 'PK2',
+               'KeyType': 'RANGE'}]
+STREAM_SPEC = {'StreamEnabled': True,
+               'StreamViewType': 'NEW_AND_OLD_IMAGES'}
+
+TNAME = 'test-dynamo-replicate'
+
+CMD = 'cd ..; serverless deploy --env test --region {2} --source-stream "{0}" --target-region "{3}" --target-table "{1}"'
+
+c1 = boto3.client('dynamodb',region_name='eu-west-1')
+c2 = boto3.client('dynamodb',region_name='us-east-1')
+
+r = c1.create_table(TableName=TNAME,
+                    KeySchema=KEY_SCHEMA,
+                    AttributeDefinitions=ATTR_DEF,
+                    StreamSpecification=STREAM_SPEC,
+                    ProvisionedThroughput={'ReadCapacityUnits':5,'WriteCapacityUnits':5})
+stream_arn1 = r['TableDescription']['LatestStreamArn']
+print "stream_arn: {0}".format(stream_arn1)
+r = c2.create_table(TableName=TNAME,
+                    KeySchema=KEY_SCHEMA,
+                    AttributeDefinitions=ATTR_DEF,
+                    StreamSpecification=STREAM_SPEC,
+                    ProvisionedThroughput={'ReadCapacityUnits':5,'WriteCapacityUnits':5})
+stream_arn2 = r['TableDescription']['LatestStreamArn']
+print "stream_arn: {0}".format(stream_arn2)
+cmd1 = CMD.format(stream_arn1,TNAME,'eu-west-1','us-east-1')
+print cmd1
+subprocess.call(cmd1, shell=True)
+cmd2 = CMD.format(stream_arn2,TNAME,'us-east-1','eu-west-1')
+print cmd2
+subprocess.call(cmd2, shell=True)
+
+

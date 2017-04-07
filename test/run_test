@@ -1,0 +1,63 @@
+#!/usr/bin/python
+
+import boto3
+import subprocess
+import time
+import random
+import pprint
+import json
+
+TNAME = 'test-dynamo-replicate'
+
+c1 = boto3.client('dynamodb',region_name='eu-west-1')
+c2 = boto3.client('dynamodb',region_name='us-east-1')
+
+
+# insert DB records
+rec1 = [{'PK1':{'N':str(random.randint(0,1000000000))},
+         'PK2':{'N':str(random.randint(0,1000000000))},
+         'foo':{'N':str(x)}} for x in xrange(100)]
+rec2 = [{'PK1':{'N':str(random.randint(0,1000000000))},
+         'PK2':{'N':str(random.randint(0,1000000000))},
+         'foo':{'N':str(x)}} for x in xrange(100)]
+
+[c1.put_item(Item=x,TableName=TNAME) for x in rec1]
+[c2.put_item(Item=x,TableName=TNAME) for x in rec2]
+
+
+time.sleep(2)
+
+# delete a few records
+for r in rec1[20:30]:
+    c1.delete_item(Key={'PK1':r['PK1'],
+                        'PK2':r['PK2']},
+                   TableName=TNAME)
+del rec1[20:30]
+
+for r in rec2[20:30]:
+    c2.delete_item(Key={'PK1':r['PK1'],
+                        'PK2':r['PK2']},
+                   TableName=TNAME)
+del rec2[20:30]
+
+time.sleep(10)
+
+def clean_db_rec(x):
+    # remove replication tracking fields
+    return dict([(k,v) for k,v in x.iteritems() if not k.startswith('_repl_')])
+
+# check table contents
+dbr1 = [clean_db_rec(x) for x in c1.scan(TableName=TNAME,Limit=200)['Items']]
+dbr2 = [clean_db_rec(x) for x in c2.scan(TableName=TNAME,Limit=200)['Items']]
+
+rec12 = rec1 + rec2
+rec12.sort(key=lambda x: int(x['PK1']['N']))
+dbr1.sort(key=lambda x: int(x['PK1']['N']))
+dbr2.sort(key=lambda x: int(x['PK1']['N']))
+open('rec12','w').write(json.dumps(rec12))
+open('dbr1','w').write(json.dumps(dbr1))
+open('dbr2','w').write(json.dumps(dbr2))
+assert(rec12==dbr1)
+assert(rec12==dbr2)
+
+
