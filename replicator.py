@@ -66,17 +66,22 @@ def write_dyn_batch(b):
         return b
 
 def split_recs_into_batches(recs):
-    # split when hit a key that already exists, or 25 elements
-    # dynamo will error if same key in same write batch
-    # but should always preserve order
-    cur_batch = []
+    # remove duplicate keys
+    # go through recs in order
+    key_d = {} # will only store one position
+    deduped_recs = []
     for key,req in recs:
-        if len(cur_batch)>=25 or any([x for x in cur_batch if x[0]==key]):  # no sets or 'in', key is a dict
-            yield(cur_batch)
-            # new batch
-            cur_batch = []
-        cur_batch.append((key,req))
-    yield cur_batch
+        # key contains a dict, so repr
+        key_r = repr(key)
+        key_r_pos = key_d.get(key_r)
+        if key_r_pos is not None:
+            # key already in list, pop the old one
+            deduped_recs.pop(key_r_pos)
+        key_d[key_r] = len(deduped_recs)
+        deduped_recs.append( (key,req) )
+    # split into groups of 25
+    for i in xrange(0,len(deduped_recs),25):
+        yield deduped_recs[i:i+25]
         
 def k_seq(x):
     return x['dynamodb'].get('SequenceNumber',0)

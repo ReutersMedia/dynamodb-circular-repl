@@ -10,6 +10,8 @@ Deletes are always replicated, and because the Lambda is not able to add the _re
 
 In the event of failure, and the Lambda is unable to replicate any of the items, it will throw an exception and cause the Kinesis data records to be retained and retried.  This retry process will last up to the stream retention period, by default 24 hours.  The Lambda will only process records in order, and will halt until the records are processed.
 
+
+
 ## Deployment
 
 The serverless stack takes three arguments:
